@@ -53,135 +53,43 @@ class CarInterface(CarInterfaceBase):
     ret.carVin = vin
     tire_stiffness_factor = 1.
 
-    if candidate == CAR.GENERICMQB:
-      # Check to make sure we received the VIN; we should have this for all MQBs
-      # XXX temp removed
-      # assert(ret.carVin != VIN_UNKNOWN), "Fingerprinted as Generic MQB but did not detect VIN"
+    ret.openpilotLongitudinalControl = False
 
+    if candidate == CAR.GENERICMQB:
       # Set common MQB parameters that will apply globally
       ret.carName = "volkswagen"
       ret.safetyModel = car.CarParams.SafetyModel.volkswagen
       ret.enableCruise = True # Stock ACC still controls acceleration and braking
-      ret.openpilotLongitudinalControl = False
       ret.steerControlType = car.CarParams.SteerControlType.torque
       ret.steerLimitAlert = True # Enable UI alert when steering torque is maxed out
 
-      # FIXME: Need to find a clean way to handle e-Golf without Getriebe_11 message
-      if has_auto_trans:
-        ret.transmissionType = car.CarParams.TransmissionType.automatic
-      else:
-        ret.transmissionType = car.CarParams.TransmissionType.manual
-
       # Additional common MQB parameters that may be overridden per-vehicle
-      ret.steerRatio = 15
-      ret.steerRateCost = 0.6
+      ret.steerRatio = 15.6
+      ret.steerRateCost = 0.4
       ret.steerActuatorDelay = 0.05 # Hopefully all MQB racks are similar here
       ret.steerMaxBP = [0.]  # m/s
       ret.steerMaxV = [1.]
 
-      # As a starting point for speed-adjusted lateral tuning, use the example
-      # map speed breakpoints from a VW Tiguan (SSP 399 page 9). It's unclear
-      # whether the driver assist map breakpoints have any direct bearing on
-      # HCA assist torque, but if they're good breakpoints for the driver,
-      # they're probably good breakpoints for HCA as well. OP won't be driving
-      # 250kph/155mph but it provides interpolation scaling above 100kmh/62mph.
-      ret.lateralTuning.pid.kpBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 100 * CV.KPH_TO_MS, 250 * CV.KPH_TO_MS]
-      ret.lateralTuning.pid.kiBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 100 * CV.KPH_TO_MS, 250 * CV.KPH_TO_MS]
+      # FIXME: Per-vehicle parameters need to be reintegrated.
+      # For the time being, per-vehicle stuff is being archived since we
+      # can't auto-detect very well yet. Now that tuning is figured out,
+      # averaged params should work reasonably on a range of cars. Owners
+      # can tweak here, as needed, until we have car type auto-detection.
 
-      # Use the VIN to look up specific make and model details
-      chassiscode = vin[6:8]
-      # XXX temp hack to make everything an Atlas if no VIN detected
-      if(chassiscode == "00"):
-        chassiscode = "CA"
+      ret.mass = 1700 + STD_CARGO_KG
+      ret.wheelbase = 2.75
+      ret.centerToFront = ret.wheelbase * 0.45
+      ret.steerRatio = 15.6
+      ret.lateralTuning.pid.kf = 0.00006
+      ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kiBP  = [[0., 50 * CV.KPH_TO_MS], [0., 50 * CV.KPH_TO_MS]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.30, 0.50], [0.20, 0.20]]
+      tire_stiffness_factor = 0.6
 
-      # B8 Passat, RoW only (North America Passat of this era is PQ/NMS)
-      # TODO: Supportable but untested vehicle, will require test and tune
-      if chassiscode == "3G":
-        # Mass given is average between the sedan and wagon, and the spread is
-        # pretty high, may need more detection here somehow.
-        # FIXME: Untested vehicle, placeholder tuning values
-        ret.mass = 1554
-        ret.wheelbase = 2.79
-
-      # Mk1 Volkswagen Arteon 2018-present
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "3H":
-        ret.mass = 1748 # Worst case with 4Motion, otherwise 1658
-        ret.wheelbase = 2.837
-        # Documented steering ratio: static 13.6:1, 2.8 turns L2L
-        # No LiveParams tuned steerRatio yet
-        # No LiveParams tuned tirestiffnessfactor yet
-
-      # Mk3 Skoda Octavia, 2013-present
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "5E" or chassiscode == "NE":
-        ret.mass = 1360
-        ret.wheelbase = 2.69
-        # TODO: Untested vehicle
-
-      # Mk3 Audi A3, S3, and RS3
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "8V" or chassiscode == "FF":
-        # FIXME: Wheelbase will vary between some versions (hatch vs sportback) so we may need more detection here somehow
-        ret.mass = 1910
-        ret.wheelbase = 2.61
-
-      # Mk7 and Mk7.5 Volkswagen Golf, Alltrack, Sportwagen, GTI, Golf R, and
-      # e-Golf, 2013-2020 depending on market.
-      # Tested and supported for Golf R
-      # TODO: All variants besides Golf R untested, will require test and tune
-      elif chassiscode == "AU":
-        # FIXME: Golf R and GTI may need different lateral tuning with their progressive variable ratio racks
-        # FIXME: ... so we need to detect R and GTI distinct from regular Golf, and can't rely on VIN.. use Motor_Code_01 engine, or maybe look at LWI-to-EPS angle variance? May need to do both.
-        # Mass will vary a bit, but wheelbase is identical for all variants.
-        ret.mass = 1372
-        ret.wheelbase = 2.630
-        ret.centerToFront = ret.wheelbase * 0.45 # Estimated from public sources
-        ret.lateralTuning.pid.kf = 0.00006
-        ret.lateralTuning.pid.kpV = [0.10, 0.20, 0.30, 0.40, 0.50]
-        ret.lateralTuning.pid.kiV = [0.20, 0.15, 0.10, 0.05, 0.05]
-        # Documented steering ratio:
-        #   Golf R and GTI: progressive 14.1:1 to 9.5:1, 2.1 turns L2L (less software stop for R)
-        #   All other variants: static 13.6:1, 2.76 turns L2L
-        ret.steerRatio = 15.6 # LiveParams auto tuned for R
-        tire_stiffness_factor = 0.6 # LiveParams auto tuned
-
-      # Mk7 Volkswagen Jetta (Sagitar in Chinese market), 2019-present
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "BU":
-        ret.mass = 1485
-        ret.wheelbase = 2.681
-        # Documented steering ratio:
-        #  Jetta GLI: static 10.3:1, 2.1 turns L2L
-
-      # Mk1 Volkswagen Atlas (Teramont in some markets), 2018-present
-      # Fully tested and supported
-      elif chassiscode == "CA":
-        ret.mass = 2042
-        ret.wheelbase = 2.97
-        ret.lateralTuning.pid.kf = 0.00006
-        ret.lateralTuning.pid.kpV = [0.05, 0.10, 0.15, 0.20, 0.50]
-        ret.lateralTuning.pid.kiV = [0.20, 0.15, 0.10, 0.05, 0.05]
-        # Documented steering ratio: static 16.3:1, 2.76 turns L2L
-        ret.steerRatio = 15.1 # LiveParams auto tuned
-        tire_stiffness_factor = 0.6 # LiveParams auto tuned, but wheel/tire size varies by trim package
-
-      # Mk3 Audi TT/TTS/TTRS, 2014-present
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "FV":
-        ret.mass = 1328
-        ret.wheelbase = 2.50
-
-      # Mk1 Audi Q2 2017-present
-      # TODO: Supportable but untested vehicle, will require test and tune
-      elif chassiscode == "GA":
-        ret.mass = 1205
-        ret.wheelbase = 2.60
-
-      # Additional common MQB parameters that need to be set after VIN parse
-      ret.mass += STD_CARGO_KG
-      # FIXME: have to set this after VIN parse so we have wheelbase, but need to test and allow overrides at the VIN level...
-      ret.centerToFront = ret.wheelbase * 0.5
+    # FIXME: Need to find a clean way to handle e-Golf without Getriebe_11 message
+    if has_auto_trans:
+      ret.transmissionType = car.CarParams.TransmissionType.automatic
+    else:
+      ret.transmissionType = car.CarParams.TransmissionType.manual
 
     # FIXME: follow 0.6.5 Comma refactoring to ensure camera-side is detected okay
     # ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, ECU.CAM) or has_relay
@@ -346,7 +254,7 @@ class CarInterface(CarInterfaceBase):
       events.append(create_event('seatbeltNotLatched', [ET.NO_ENTRY, ET.SOFT_DISABLE]))
     if ret.gearShifter == 'reverse':
       events.append(create_event('reverseGear', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
-    if not ret.gearShifter == 'drive' or ret.gearShifter == 'eco':
+    if not ret.gearShifter == 'drive' and not ret.gearShifter == 'eco':
       events.append(create_event('wrongGear', [ET.NO_ENTRY, ET.SOFT_DISABLE]))
     # TODO: pending add of alerts.py event
     # if ret.clutchPressed:

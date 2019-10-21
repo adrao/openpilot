@@ -48,6 +48,10 @@ bool controls_allowed = 0;
 bool gas_interceptor_detected = 0;
 int gas_interceptor_prev = 0;
 
+// This is set based on EON heartbeat detection.
+bool eon_alive = false;
+
+
 // This is set by USB command 0xdf
 bool long_controls_allowed = 1;
 

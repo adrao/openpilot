@@ -114,23 +114,47 @@ class CarState():
     self.CP = CP
     self.car_fingerprint = CP.carFingerprint
     self.can_define = CANDefine(DBC[CP.carFingerprint]['pt'])
+
+    self.wheelSpeedFL, self.wheelSpeedFR, self.wheelSpeedRL, self.wheelSpeedRR = 0, 0, 0, 0
+    self.vEgoRaw, self.vEgo, self.aEgo = 0, 0, 0
+    self.standstill = False
+
+    self.steeringAngle = 0
+    self.steeringRate = 0
+    self.steeringTorque = 0
+    self.steeringPressed = False
+    self.yawRate = 0
+
+    self.gas = 0
+    self.gasPressed = False
+    self.brake = 0
+    self.brakePressed = False
+    self.brakeLights = False
+
     self.shifter_values = self.can_define.dv["Getriebe_11"]['GE_Fahrstufe']
-    self.left_blinker_on = False
-    self.prev_left_blinker_on = False
-    self.right_blinker_on = False
-    self.prev_right_blinker_on = False
-    self.steer_torque_driver = 0
-    self.steer_not_allowed = False
-    self.angle_steers_rate = 0
-    self.steer_error = 0
-    self.park_brake = 0
-    self.esp_disabled = 0
-    self.yaw_rate = 0
-    self.mass = 0
+    self.gearShifter = None
+
+    self.leftBlinker = False
+    self.rightBlinker = False
+
+    self.seatbeltUnlatched = False
+    self.doorOpen = False
+    self.parkingBrakeSet = False
+    self.stabilityControlDisabled = False
+    self.steeringFault = False
+    self.displayMetricUnits = False
+
+    self.clutchPressed = False
+
+    self.accFault, self.accAvailable, self.accEnabled = False, False, False
+    self.accSetSpeed = 0
+
+    self.gra_acc_buttons = gra_acc_buttons_dict.copy()
+    self.gra_typ_hauptschalter = None
+    self.gra_buttontypeinfo = None
+    self.gra_tip_stufe_2 = None
+
     self.has_auto_trans = True
-    self.clutch_pressed = False
-    self.is_metric, is_metric_prev = False, None
-    self.acc_enabled, self.acc_active, self.acc_error = False, False, False
 
     # vEgo kalman filter
     dt = 0.01
@@ -138,88 +162,87 @@ class CarState():
                          A=[[1., dt], [0., 1.]],
                          C=[1., 0.],
                          K=[[0.12287673], [0.29666309]])
-    self.v_ego = 0.
-
-    self.gra_acc_buttons = gra_acc_buttons_dict
-    self.gra_acc_buttons_prev = self.gra_acc_buttons.copy()
 
   def update(self, gw_cp, ex_cp):
-    # Check to make sure the electric power steering rack is configured to
-    # accept and respond to HCA_01 messages and has not encountered a fault.
-    self.steer_error = not gw_cp.vl["EPS_01"]["HCA_Ready"]
+    # Update vehicle speed and acceleration from ABS wheel speeds.
+    self.wheelSpeedFL = gw_cp.vl["ESP_19"]['ESP_VL_Radgeschw_02'] * CV.KPH_TO_MS
+    self.wheelSpeedFR = gw_cp.vl["ESP_19"]['ESP_VR_Radgeschw_02'] * CV.KPH_TO_MS
+    self.wheelSpeedRL = gw_cp.vl["ESP_19"]['ESP_HL_Radgeschw_02'] * CV.KPH_TO_MS
+    self.wheelSpeedRR = gw_cp.vl["ESP_19"]['ESP_HR_Radgeschw_02'] * CV.KPH_TO_MS
+
+    self.vEgoRaw = float(np.mean([self.wheelSpeedFL, self.wheelSpeedFR, self.wheelSpeedRL, self.wheelSpeedRR]))
+    v_ego_x = self.v_ego_kf.update(self.vEgoRaw)
+    self.vEgo = float(v_ego_x[0])
+    self.aEgo = float(v_ego_x[1])
+    self.standstill = self.vEgoRaw < 0.1
+
+    # Update steering angle, rate, yaw rate, and driver input torque. VW send
+    # the sign/direction in a separate signal so they must be recombined.
+    self.steeringAngle = gw_cp.vl["LWI_01"]['LWI_Lenkradwinkel'] * (1,-1)[int(gw_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
+    self.steeringRate = gw_cp.vl["LWI_01"]['LWI_Lenkradw_Geschw'] * (1,-1)[int(gw_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
+    self.steeringTorque = gw_cp.vl["EPS_01"]['Driver_Strain'] * (1,-1)[int(gw_cp.vl["EPS_01"]['Driver_Strain_VZ'])]
+    self.steeringPressed = abs(self.steeringTorque) > CarControllerParams.STEER_DRIVER_ALLOWANCE
+    self.yawRate = gw_cp.vl["ESP_02"]['ESP_Gierrate'] * (1,-1)[int(gw_cp.vl["ESP_02"]['ESP_VZ_Gierrate'])] * CV.DEG_TO_RAD
+
+    # Update gas, brakes, and gearshift.
+    self.gas = gw_cp.vl["Motor_20"]['MO_Fahrpedalrohwert_01'] / 100.0
+    self.gasPressed = self.gas > 0
+    self.brake = gw_cp.vl["ESP_05"]['ESP_Bremsdruck'] / 250.0 # FIXME: this is pressure in Bar, not sure what OP expects
+    self.brakePressed = bool(gw_cp.vl["ESP_05"]['ESP_Fahrer_bremst'])
+    self.brakeLights = bool(gw_cp.vl["ESP_05"]['ESP_Status_Bremsdruck'])
+
+    # Update gear and/or clutch position data.
+    # FIXME: need a real mechanism for detecting has_auto_trans
+    if self.has_auto_trans:
+      can_gear_shifter = int(gw_cp.vl["Getriebe_11"]['GE_Fahrstufe'])
+      self.gearShifter = parse_gear_shifter(can_gear_shifter, self.shifter_values)
+    else:
+      self.clutchPressed = not gw_cp.vl["Motor_14"]['MO_Kuppl_schalter']
+
+    # Update door and trunk/hatch lid open status.
+    self.doorOpen = any([gw_cp.vl["Gateway_72"]['ZV_FT_offen'],
+                         gw_cp.vl["Gateway_72"]['ZV_BT_offen'],
+                         gw_cp.vl["Gateway_72"]['ZV_HFS_offen'],
+                         gw_cp.vl["Gateway_72"]['ZV_HBFS_offen'],
+                         gw_cp.vl["Gateway_72"]['ZV_HD_offen']])
+
+    # Update seatbelt fastened status.
+    self.seatbeltUnlatched = False if gw_cp.vl["Airbag_02"]["AB_Gurtschloss_FA"] == 3 else True
 
     # Update driver preference for metric. VW stores many different unit
     # preferences, including separate units for for distance vs. speed.
     # We use the speed preference for OP.
-    self.is_metric_prev = self.is_metric
-    self.is_metric = not gw_cp.vl["Einheiten_01"]["KBI_MFA_v_Einheit_02"]
+    self.displayMetricUnits = not gw_cp.vl["Einheiten_01"]["KBI_MFA_v_Einheit_02"]
 
-    # Update seatbelt fastened status
-    self.seatbelt = 1 if gw_cp.vl["Airbag_02"]["AB_Gurtschloss_FA"] == 3 else 0
-    # Update door and trunk/hatch lid open status
-    self.door_all_closed = not any([gw_cp.vl["Gateway_72"]['ZV_FT_offen'],
-                                    gw_cp.vl["Gateway_72"]['ZV_BT_offen'],
-                                    gw_cp.vl["Gateway_72"]['ZV_HFS_offen'],
-                                    gw_cp.vl["Gateway_72"]['ZV_HBFS_offen'],
-                                    gw_cp.vl["Gateway_72"]['ZV_HD_offen']])
-
-    # Update dynamic vehicle mass calculated by the drivetrain coordinator.
-    # FIXME: Can't actually do this without adding mass to CarState in capnp
-    # self.mass = gw_cp.vl["Motor_16"]['TSK_Fahrzeugmasse_02']
-
-    # Update turn signal stalk status. This is the user control, not the
-    # external lamps.
-    # TODO: Bring in signals from Blinkmodi_01 to also have light status as well as switch status
-    self.prev_left_blinker_on = self.left_blinker_on
-    self.left_blinker_on = gw_cp.vl["Gateway_72"]['BH_Blinker_li']
-    self.prev_right_blinker_on = self.right_blinker_on
-    self.right_blinker_on = gw_cp.vl["Gateway_72"]['BH_Blinker_re']
-
-    # Update speed from ABS wheel speeds
-    self.v_wheel_fl = gw_cp.vl["ESP_19"]['ESP_HL_Radgeschw_02'] * CV.KPH_TO_MS
-    self.v_wheel_fr = gw_cp.vl["ESP_19"]['ESP_HR_Radgeschw_02'] * CV.KPH_TO_MS
-    self.v_wheel_rl = gw_cp.vl["ESP_19"]['ESP_VL_Radgeschw_02'] * CV.KPH_TO_MS
-    self.v_wheel_rr = gw_cp.vl["ESP_19"]['ESP_VR_Radgeschw_02'] * CV.KPH_TO_MS
-
-    # NOTE: there are high-resolution speeds available from the car, should
-    # we use those instead?
-    speed_estimate = float(np.mean([self.v_wheel_fl, self.v_wheel_fr, self.v_wheel_rl, self.v_wheel_rr]))
-    self.v_ego_raw = speed_estimate
-    v_ego_x = self.v_ego_kf.update(speed_estimate)
-    self.v_ego = float(v_ego_x[0])
-    self.a_ego = float(v_ego_x[1])
-    self.standstill = self.v_ego_raw < 0.1
-
-    # Update steering angle, rate, yaw rate, and driver input torque. VW send
-    # the sign/direction in a separate signal so they must be recombined.
-    self.angle_steers = gw_cp.vl["LWI_01"]['LWI_Lenkradwinkel'] * (1,-1)[int(gw_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
-    self.angle_steers_rate = gw_cp.vl["LWI_01"]['LWI_Lenkradw_Geschw'] * (1,-1)[int(gw_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
-    self.steer_torque_driver = gw_cp.vl["EPS_01"]['Driver_Strain'] * (1,-1)[int(gw_cp.vl["EPS_01"]['Driver_Strain_VZ'])]
-    # NOTE: Using a yaw rate signal from the vehicle's ESP controller, but the
-    # signal is a little noisy. We may want to Kalman filter it, or calculate
-    # it ourselves using the vehicle model instead like Honda and Toyota.
-    self.yaw_rate = gw_cp.vl["ESP_02"]['ESP_Gierrate'] * (1,-1)[int(gw_cp.vl["ESP_02"]['ESP_VZ_Gierrate'])]
-
-    self.steer_override = abs(self.steer_torque_driver) > CarControllerParams.STEER_DRIVER_ALLOWANCE
-
-    # Update gas, brakes, and gearshift
-    self.pedal_gas = gw_cp.vl["Motor_20"]['MO_Fahrpedalrohwert_01'] / 100.0
-    self.brake_pressed = gw_cp.vl["ESP_05"]['ESP_Fahrer_bremst']
-    self.brake_lights = gw_cp.vl["ESP_05"]['ESP_Status_Bremsdruck']
-    self.user_brake = gw_cp.vl["ESP_05"]['ESP_Bremsdruck'] # FIXME: this is pressure in Bar, not sure what OP expects
-    self.park_brake = gw_cp.vl["Kombi_01"]['KBI_Handbremse'] # FIXME: need to include an EPB check as well
-    self.esp_disabled = gw_cp.vl["ESP_21"]['ESP_Tastung_passiv']
-
-    # Update gear position data
-    # FIXME: need a real mechanism for detecting has_auto_trans
-    if self.has_auto_trans:
-      can_gear_shifter = int(gw_cp.vl["Getriebe_11"]['GE_Fahrstufe'])
-      self.gear_shifter = parse_gear_shifter(can_gear_shifter, self.shifter_values)
+    # Update ACC radar status.
+    accStatus = ex_cp.vl["ACC_06"]['ACC_Status_ACC']
+    if accStatus == 1:
+      # ACC okay but disabled
+      self.accFault = False
+      self.accAvailable = False
+      self.accEnabled = False
+    elif accStatus == 2:
+      # ACC okay and enabled, but not currently engaged
+      self.accFault = False
+      self.accAvailable = True
+      self.accEnabled = False
+    elif accStatus in [3, 4, 5]:
+      # ACC okay and enabled, currently engaged and regulating speed (3) or engaged with driver accelerating (4) or overrun (5)
+      self.accFault = False
+      self.accAvailable = True
+      self.accEnabled = True
     else:
-      self.clutch_pressed = not gw_cp.vl["Motor_14"]['MO_Kuppl_schalter']
+      # ACC fault of some sort. Seen statuses 6 or 7 for CAN comms disruptions, visibility issues, etc.
+      self.accFault = True
+      self.accAvailable = False
+      self.accEnabled = False
+
+    # Update ACC setpoint. When the setpoint is zero or there's an error, the
+    # radar sends a set-speed of ~90.69 m/s / 203mph.
+    self.accSetSpeed = ex_cp.vl["ACC_02"]['SetSpeed']
+    if self.accSetSpeed > 90: self.accSetSpeed = 0
 
     # Update ACC cruise control buttons
-    self.gra_acc_buttons_prev = self.gra_acc_buttons.copy()
     self.gra_acc_buttons["main"] = bool(gw_cp.vl["GRA_ACC_01"]['GRA_Hauptschalter'])
     self.gra_acc_buttons["cancel"] = bool(gw_cp.vl["GRA_ACC_01"]['GRA_Abbrechen'])
     self.gra_acc_buttons["set"] = bool(gw_cp.vl["GRA_ACC_01"]['GRA_Tip_Setzen'])
@@ -235,21 +258,16 @@ class CarState():
     self.gra_buttontypeinfo = gw_cp.vl["GRA_ACC_01"]['GRA_ButtonTypeInfo']
     self.gra_tip_stufe_2 = gw_cp.vl["GRA_ACC_01"]['GRA_Tip_Stufe_2']
 
-    # Update ACC engagement details
-    acc_control_status = ex_cp.vl["ACC_06"]['ACC_Status_ACC']
-    if acc_control_status == 1:
-      # ACC okay but disabled
-      self.acc_error, self.acc_enabled, self.acc_active = False, False, False
-    elif acc_control_status == 2:
-      # ACC okay and enabled, but not currently engaged
-      self.acc_error, self.acc_enabled, self.acc_active = False, True, False
-    elif acc_control_status in [3, 4, 5]:
-      # ACC okay and enabled, currently engaged and regulating speed (3) or engaged with driver accelerating (4) or overrun (5)
-      self.acc_error, self.acc_enabled, self.acc_active = False, True, True
-    else:
-      # ACC fault of some sort. Seen statuses 6 or 7 for CAN comms disruptions, visibility issues, etc.
-      self.acc_error, self.acc_enabled, self.acc_active = True, False, False
+    # Check to make sure the electric power steering rack is configured to
+    # accept and respond to HCA_01 messages and has not encountered a fault.
+    self.steeringFault = not gw_cp.vl["EPS_01"]["HCA_Ready"]
 
-    self.cruise_set_speed = ex_cp.vl["ACC_02"]['SetSpeed']
-    # When the setpoint is zero or there's an error, the radar sends a set-speed of ~90.69 m/s / 203mph
-    if self.cruise_set_speed > 90: self.cruise_set_speed = 0
+    # Update turn signal stalk status. This is the driver switch, not the
+    # external lamps.
+    self.leftBlinker = bool(gw_cp.vl["Gateway_72"]['BH_Blinker_li'])
+    self.rightBlinker = bool(gw_cp.vl["Gateway_72"]['BH_Blinker_re'])
+
+    # Additional safety checks performed in CarInterface.
+    self.parkingBrakeSet = bool(gw_cp.vl["Kombi_01"]['KBI_Handbremse']) # FIXME: need to include an EPB check as well
+    self.stabilityControlDisabled = gw_cp.vl["ESP_21"]['ESP_Tastung_passiv']
+

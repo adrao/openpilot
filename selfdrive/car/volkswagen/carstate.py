@@ -27,7 +27,8 @@ def get_mqb_gateway_can_parser(CP, canbus):
     ("ZV_HD_offen", "Gateway_72", 0),             # Trunk or hatch open
     ("BH_Blinker_li", "Gateway_72", 0),           # Left turn signal on
     ("BH_Blinker_re", "Gateway_72", 0),           # Right turn signal on
-    ("GE_Fahrstufe", "Getriebe_11", 0),           # Transmission gear selector position
+    ("GE_Fahrstufe", "Getriebe_11", 0),           # Auto trans gear selector position
+    {"GearPosition", "EV_Gearshift", 0},          # EV gear selector position
     ("AB_Gurtschloss_FA", "Airbag_02", 0),        # Seatbelt status, driver
     ("AB_Gurtschloss_BF", "Airbag_02", 0),        # Seatbelt status, passenger
     ("ESP_Fahrer_bremst", "ESP_05", 0),           # Brake pedal pressed
@@ -64,6 +65,7 @@ def get_mqb_gateway_can_parser(CP, canbus):
     ("Motor_20", 50),     # From J623 Engine control module
     ("GRA_ACC_01", 33),   # From J??? steering wheel control buttons
     ("Getriebe_11", 20),  # From J743 Auto transmission control module
+    {"EV_Gearshift", 10}, # From J??? in e-Golf and presumably other MQB EVs
     ("Gateway_72", 10),   # From J533 CAN gateway (aggregated data)
     ("Motor_14", 10),     # From J623 Engine control module
     ("Airbag_02", 5),     # From J234 Airbag control module

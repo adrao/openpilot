@@ -132,17 +132,26 @@ Supported Cars
 Community Maintained Cars
 ------
 
-| Make                 | Model                    | Supported Package    | Lateral | Longitudinal   | No Accel Below   | No Steer Below | Giraffe           |
-| ---------------------| -------------------------| ---------------------| --------| ---------------| -----------------| ---------------|-------------------|
-| Tesla                | Model S 2012-13          | All                  | Yes     | Not yet        | Not applicable   | 0mph           | Custom<sup>8</sup>|
+| Make                 | Model                    | Supported Package     | Lateral | Longitudinal   | No Accel Below   | No Steer Below | Giraffe            |
+| ---------------------| -------------------------| ----------------------| --------| ---------------| -----------------| ---------------|--------------------|
+| Škoda                | Octavia 2013--           |                       | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Tesla                | Model S 2012-13          | All                   | Yes     | Not yet        | Not applicable   | 0mph           | Custom<sup>8</sup> |
+| Volkswagen           | Atlas 2018--             | SE w/Tech and above   | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Volkswagen           | e-Golf 2015--            | Driver Assist Package | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Volkswagen           | Golf 2013-19             | Driver Assist Package | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Volkswagen           | Golf GTI 2013-19         | Autobahn              | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Volkswagen           | Golf R 2013-17 (Mk7)     | Driver Assist Package | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
+| Volkswagen           | Golf R 2018-19 (Mk7.5)   | All                   | Yes     | Stock          | Not applicable   | 0mph           | Custom<sup>9</sup> |
 
 [[Tesla Model S Pull Request]](https://github.com/commaai/openpilot/pull/246) <br />
 <sup>8</sup>Community built Giraffe, find more information here [Community Tesla Giraffe](https://github.com/jeankalud/neo/tree/tesla_giraffe/giraffe/tesla) <br />
+<sup>9</sup>Community built J533 gateway harness, find more information at the [Volkswagen page](https://community.comma.ai/wiki/index.php/Volkswagen) of the Comma AI Wiki.<br />
 
 Community Maintained Cars are not confirmed by comma.ai to meet our [safety model](https://github.com/commaai/openpilot/blob/devel/SAFETY.md). Be extra cautious using them.
 
 In Progress Cars
 ------
+- All Volkswagen, Audi, SEAT, and Škoda [MQB platform](https://en.wikipedia.org/wiki/Volkswagen_Group_MQB_platform) vehicles with factory ACC.
 - All TSS-P Toyota with Steering Assist and LSS-P Lexus with Steering Assist or Lane Keep Assist.
 - All Hyundai with SmartSense.
 - All Kia, Genesis with SCC and LKAS.
@@ -156,7 +165,7 @@ If your car has adaptive cruise control and lane keep assist, you are in luck. U
 
 We've written guides for [Brand](https://medium.com/@comma_ai/how-to-write-a-car-port-for-openpilot-7ce0785eda84) and [Model](https://medium.com/@comma_ai/openpilot-port-guide-for-toyota-models-e5467f4b5fe6) ports. These guides might help you after you have the basics figured out.
 
-- BMW, Audi, Volvo, and Mercedes all use [FlexRay](https://en.wikipedia.org/wiki/FlexRay) and can be supported after [FlexRay support](https://github.com/commaai/openpilot/pull/463) is merged.
+- BMW, certain [MLB and MLBevo platform](https://en.wikipedia.org/wiki/Volkswagen_Group_MLB_platform) Audi and Volkswagen, Volvo, and Mercedes all use [FlexRay](https://en.wikipedia.org/wiki/FlexRay) and can be supported after [FlexRay support](https://github.com/commaai/openpilot/pull/463) is merged.
 - We put time into a Ford port, but the steering has a 10 second cutout limitation that makes it unusable.
 - The 2016-2017 Honda Accord uses a custom signaling protocol for steering that's unlikely to ever be upstreamed.
 

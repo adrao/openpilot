@@ -1,1 +1,1 @@
-#define COMMA_VERSION "0.6.5-VW0.81"
+#define COMMA_VERSION "0.6.5-VW0.8.2"

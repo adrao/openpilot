@@ -1,11 +1,11 @@
-Version 0.6.5 + VW 0.82 (2019-10-20)
+Version 0.6.5 + VW 0.8.2 (2019-10-20)
 ========================
  * Community port only: Panda safety goes fully transparent/stock if EON/OP are offline.
  * Remove dead/far-future code in preparation for upstreaming.
  * Refactor and move all type casting/scaling to carstate, state tracking to interface.
  * Correct longstanding bug with ABS wheel speed being reversed front to back.
 
-Version 0.6.5 + VW 0.8 (2019-10-19)
+Version 0.6.5 + VW 0.8.0 (2019-10-19)
 ========================
  * Synced with Comma upstreamed cereal, OpenDBC, and Panda components.
  * Automated reflash of Panda with final Volkswagen safety model!

@@ -1310,7 +1310,7 @@ BO_ 1720 Kombi_03: 8 XXX
 BO_ 391 EV_Gearshift: 8 XXX
  SG_ CHECKSUM : 0|8@1+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 8|4@1+ (1,0) [0|15] "" XXX
- SG_ GearPosition : 16|4@1+ (1,0) [0|255] "" XXX
+ SG_ GearPosition : 16|4@1+ (1,0) [0|15] "" XXX
  SG_ RegenBrakingMode : 12|2@1+ (1,0) [0|3] "" XXX
 
 CM_ SG_ 173 COUNTERXX "Message not renamed to COUNTER because J533 rate-limiting makes it look like messages are being lost";

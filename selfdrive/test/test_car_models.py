@@ -378,6 +378,10 @@ routes = {
     'carFingerprint': SUBARU.IMPREZA,
     'enableCamera': True,
   },
+  "76b83eb0245de90e|2019-10-21--17-40-42": {
+    'carFingerprint': VOLKSWAGEN.GENERICMQB,
+    'enableCamera': True,
+  },
   # Tesla route, should result in mock car
   "07cb8a788c31f645|2018-06-17--18-50-29": {
     'carFingerprint': MOCK.MOCK,

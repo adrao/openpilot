@@ -71,8 +71,11 @@ class CarInterface(CarInterfaceBase):
       # HCA assist torque, but if they're good breakpoints for the driver,
       # they're probably good breakpoints for HCA as well. OP won't be driving
       # 250kph/155mph but it provides interpolation scaling above 100kmh/62mph.
-      ret.lateralTuning.pid.kpBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS]
-      ret.lateralTuning.pid.kiBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS]
+      # ret.lateralTuning.pid.kpBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS]
+      # ret.lateralTuning.pid.kiBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS]
+      ret.lateralTuning.pid.kpBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 100 * CV.KPH_TO_MS, 250 * CV.KPH_TO_MS]
+      ret.lateralTuning.pid.kiBP = [0., 15 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 100 * CV.KPH_TO_MS, 250 * CV.KPH_TO_MS]
+
 
       # FIXME: Per-vehicle parameters need to be reintegrated.
       # For the time being, per-vehicle stuff is being archived since we
@@ -85,8 +88,10 @@ class CarInterface(CarInterfaceBase):
       ret.centerToFront = ret.wheelbase * 0.45
       ret.steerRatio = 15.6
       ret.lateralTuning.pid.kf = 0.00006
-      ret.lateralTuning.pid.kpV = [0.15, 0.25, 0.60]
-      ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05]
+      # ret.lateralTuning.pid.kpV = [0.15, 0.25, 0.60]
+      # ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05]
+      ret.lateralTuning.pid.kpV = [0.10, 0.20, 0.30, 0.40, 0.50]
+      ret.lateralTuning.pid.kiV = [0.20, 0.15, 0.10, 0.10, 0.05]
       tire_stiffness_factor = 0.6
 
     ret.enableCamera = True # Stock camera detection doesn't apply to VW

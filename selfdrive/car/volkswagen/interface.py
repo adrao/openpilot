@@ -83,8 +83,8 @@ class CarInterface(CarInterfaceBase):
       # averaged params should work reasonably on a range of cars. Owners
       # can tweak here, as needed, until we have car type auto-detection.
 
-      ret.mass = 1600 + STD_CARGO_KG
-      ret.wheelbase = 2.75
+      ret.mass = 1372 + STD_CARGO_KG # Golf TDI
+      ret.wheelbase = 2.637 # Golf TDI
       ret.centerToFront = ret.wheelbase * 0.45
       ret.steerRatio = 15.6
       ret.lateralTuning.pid.kf = 0.00006
@@ -92,8 +92,8 @@ class CarInterface(CarInterfaceBase):
       # ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05]
       # ret.lateralTuning.pid.kpV = [0.10, 0.20, 0.30, 0.40, 0.50]
       # ret.lateralTuning.pid.kiV = [0.10, 0.075, 0.05, 0.05, 0.05]
-      ret.lateralTuning.pid.kpV = [0.05, 0.10, 0.15, 0.40, 0.50]
-      ret.lateralTuning.pid.kiV = [0.05, 0.05, 0.05, 0.05, 0.05]
+      ret.lateralTuning.pid.kpV = [0.05, 0.10, 0.15, 0.30, 0.45, 0.60]
+      ret.lateralTuning.pid.kiV = [0.075, 0.05, 0.05, 0.05, 0.05, 0.05]
       tire_stiffness_factor = 0.6
 
     ret.enableCamera = True # Stock camera detection doesn't apply to VW

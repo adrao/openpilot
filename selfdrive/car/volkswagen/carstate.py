@@ -56,9 +56,6 @@ def get_mqb_gateway_can_parser(CP, canbus):
     ("GRA_Tip_Stufe_2", "GRA_ACC_01", 0),         # unknown related to stalk type
     ("GRA_ButtonTypeInfo", "GRA_ACC_01", 0),      # unknown related to stalk type
     ("COUNTER", "GRA_ACC_01", 0),                 # GRA_ACC_01 CAN message counter
-    ("ACC_Status_ACC", "ACC_06", 0),              # ACC engagement status
-    ("ACC_Typ", "ACC_06", 0),                     # ACC type (follow to stop, stop&go)
-    ("SetSpeed", "ACC_02", 0),                    # ACC set speed
   ]
 
   checks = [
@@ -66,13 +63,11 @@ def get_mqb_gateway_can_parser(CP, canbus):
     ("LWI_01", 100),      # From J500 Steering Assist with integrated sensors
     ("EPS_01", 100),      # From J500 Steering Assist with integrated sensors
     ("ESP_19", 100),      # From J104 ABS/ESP controller
-    ("ACC_06", 50),       # From J428 ACC radar control module
     ("ESP_05", 50),       # From J104 ABS/ESP controller
     ("ESP_21", 50),       # From J104 ABS/ESP controller
     ("Motor_20", 50),     # From J623 Engine control module
     ("GRA_ACC_01", 33),   # From J??? steering wheel control buttons
     ("Getriebe_11", 20),  # From J743 Auto transmission control module
-    ("ACC_02", 17),       # From J428 ACC radar control module
     ("Gateway_72", 10),   # From J533 CAN gateway (aggregated data)
     ("Motor_14", 10),     # From J623 Engine control module
     ("Airbag_02", 5),     # From J234 Airbag control module
@@ -87,10 +82,15 @@ def get_mqb_extended_can_parser(CP, canbus):
 
   signals = [
     # sig_name, sig_address, default
+    ("ACC_Status_ACC", "ACC_06", 0),                          # ACC engagement status
+    ("ACC_Typ", "ACC_06", 0),                                 # ACC type (follow to stop, stop&go)
+    ("SetSpeed", "ACC_02", 0),                                # ACC set speed
   ]
 
   checks = [
     # sig_address, frequency
+    ("ACC_06", 50),                                           # From J428 ACC radar control module
+    ("ACC_02", 17),                                           # From J428 ACC radar control module
   ]
 
   return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, canbus.extended)
@@ -171,7 +171,7 @@ class CarState():
     self.displayMetricUnits = not gw_cp.vl["Einheiten_01"]["KBI_MFA_v_Einheit_02"]
 
     # Update ACC radar status.
-    accStatus = gw_cp.vl["ACC_06"]['ACC_Status_ACC']
+    accStatus = ex_cp.vl["ACC_06"]['ACC_Status_ACC']
     if accStatus == 1:
       # ACC okay but disabled
       self.accFault = False
@@ -195,7 +195,7 @@ class CarState():
 
     # Update ACC setpoint. When the setpoint is zero or there's an error, the
     # radar sends a set-speed of ~90.69 m/s / 203mph.
-    self.accSetSpeed = gw_cp.vl["ACC_02"]['SetSpeed']
+    self.accSetSpeed = ex_cp.vl["ACC_02"]['SetSpeed']
     if self.accSetSpeed > 90: self.accSetSpeed = 0
 
     # Update control button states for turn signals and ACC controls.

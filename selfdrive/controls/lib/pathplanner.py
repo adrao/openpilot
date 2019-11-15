@@ -25,6 +25,7 @@ class PathPlanner():
 
     self.setup_mpc(CP.steerRateCost)
     self.solution_invalid_cnt = 0
+    self.path_offset_i = 0.0
     self.frame = 0
     self.curvature_offset = CurvatureLearner(debug=False)
 

@@ -4,7 +4,7 @@ import numpy as np
 CAMERA_OFFSET = 0.06  # m from center car to camera
 
 def mean(numbers):
-    return float(sum(numbers)) / max(len(numbers), 1)
+  return float(sum(numbers)) / max(len(numbers), 1)
 
 def compute_path_pinv(l=50):
   deg = 3

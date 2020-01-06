@@ -12,8 +12,8 @@ class CarControllerParams:
   # Limiting both torque and rate-of-change based on real-world testing and
   # Comma's safety requirements for minimum time to lane departure.
   STEER_MAX = 300                # Max heading control assist torque 3.00 Nm
-  STEER_DELTA_UP = 10            # Max HCA reached in 0.60s (STEER_MAX / (50Hz * 0.60))
-  STEER_DELTA_DOWN = 300         # Min HCA reached anytime
+  STEER_DELTA_UP = 4             # Max HCA reached in 1.50s (STEER_MAX / (50Hz * 1.50))
+  STEER_DELTA_DOWN = 10          # Min HCA reached in 0.60s (STEER_MAX / (50Hz * 0.60))
   STEER_DRIVER_ALLOWANCE = 80
   STEER_DRIVER_MULTIPLIER = 3    # weight driver torque heavily
   STEER_DRIVER_FACTOR = 1        # from dbc
@@ -58,6 +58,13 @@ FINGERPRINTS = {
      1438:8, 1461:8, 391:8, 1511: 8, 1516: 8, 568:8, 569:8, 826:8, 827:8, 1156:8, 1157:8, 1158:8, 1471:8, 1635:8
      },
   ],
+}
+
+class ECU:
+  CAM = 0
+
+ECU_FINGERPRINT = {
+  ECU.CAM: [294, 919],                    # HCA_01 Heading Control Assist, LDW_02 Lane Departure Warning
 }
 
 DBC = {

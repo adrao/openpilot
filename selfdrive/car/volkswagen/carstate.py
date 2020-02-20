@@ -54,6 +54,7 @@ def get_mqb_pt_can_parser(CP, canbus):
     ("GRA_Typ_Hauptschalter", "GRA_ACC_01", 0),   # ACC main button type
     ("GRA_Tip_Stufe_2", "GRA_ACC_01", 0),         # unknown related to stalk type
     ("GRA_ButtonTypeInfo", "GRA_ACC_01", 0),      # unknown related to stalk type
+    ("GRA_Typ468", "GRA_ACC_01", 0),              # Set/Resume button behavior as overloaded coast/accel??
     ("COUNTER", "GRA_ACC_01", 0),                 # GRA_ACC_01 CAN message counter
   ]
 
@@ -77,14 +78,14 @@ def get_mqb_pt_can_parser(CP, canbus):
 
   return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, canbus.pt)
 
-
 def get_mqb_cam_can_parser(CP, canbus):
 
   signals = [
     # sig_name, sig_address, default
-    ("ACC_Status_ACC", "ACC_06", 0),      # ACC engagement status
-    ("ACC_Typ", "ACC_06", 0),             # ACC type (follow to stop, stop&go)
-    ("SetSpeed", "ACC_02", 0),            # ACC set speed
+    ("ACC_Status_ACC", "ACC_06", 0),              # ACC engagement status
+    ("ACC_Typ", "ACC_06", 0),                     # ACC type (follow to stop, stop&go)
+    ("ACC_Anhalten", "ACC_06", 0),                # ACC standstill flag
+    ("SetSpeed", "ACC_02", 0),                    # ACC set speed
   ]
 
   checks = [
@@ -95,15 +96,10 @@ def get_mqb_cam_can_parser(CP, canbus):
 
   return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, canbus.cam)
 
-def parse_gear_shifter(gear, vals):
+def parse_gear_shifter(gear):
   # Return mapping of gearshift position to selected gear.
-
-  val_to_capnp = {'P': GEAR.park, 'R': GEAR.reverse, 'N': GEAR.neutral,
-                  'D': GEAR.drive, 'E': GEAR.eco, 'S': GEAR.sport, 'T': GEAR.manumatic}
-  try:
-    return val_to_capnp[vals[gear]]
-  except KeyError:
-    return "unknown"
+  return {'P': GEAR.park, 'R': GEAR.reverse, 'N': GEAR.neutral,
+              'D': GEAR.drive, 'E': GEAR.eco, 'S': GEAR.sport, 'T': GEAR.manumatic}.get(gear, GEAR.unknown)
 
 class CarState():
   def __init__(self, CP, canbus):
@@ -153,7 +149,7 @@ class CarState():
 
     # Update gear and/or clutch position data.
     can_gear_shifter = int(pt_cp.vl["Getriebe_11"]['GE_Fahrstufe'])
-    self.gearShifter = parse_gear_shifter(can_gear_shifter, self.shifter_values)
+    self.gearShifter = parse_gear_shifter(self.shifter_values.get(can_gear_shifter, None))
 
     # Update door and trunk/hatch lid open status.
     self.doorOpen = any([pt_cp.vl["Gateway_72"]['ZV_FT_offen'],
@@ -197,6 +193,7 @@ class CarState():
     # radar sends a set-speed of ~90.69 m/s / 203mph.
     self.accSetSpeed = cam_cp.vl["ACC_02"]['SetSpeed']
     if self.accSetSpeed > 90: self.accSetSpeed = 0
+    self.accStandstill = bool(cam_cp.vl["ACC_06"]['ACC_Anhalten'])
 
     # Update control button states for turn signals and ACC controls.
     self.buttonStates["leftBlinker"] = bool(pt_cp.vl["Gateway_72"]['BH_Blinker_li'])
@@ -215,6 +212,7 @@ class CarState():
     self.graTypHauptschalter = pt_cp.vl["GRA_ACC_01"]['GRA_Typ_Hauptschalter']
     self.graButtonTypeInfo = pt_cp.vl["GRA_ACC_01"]['GRA_ButtonTypeInfo']
     self.graTipStufe2 = pt_cp.vl["GRA_ACC_01"]['GRA_Tip_Stufe_2']
+    self.graTyp468 = pt_cp.vl["GRA_ACC_01"]['GRA_Typ468']
     # Pick up the GRA_ACC_01 CAN message counter so we can sync to it for
     # later cruise-control button spamming.
     self.graMsgBusCounter = pt_cp.vl["GRA_ACC_01"]['COUNTER']

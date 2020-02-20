@@ -25,7 +25,10 @@
 #include <zmq.h>
 #include <yaml-cpp/yaml.h>
 #include <capnp/serialize.h>
+
+#ifdef QCOM
 #include <cutils/properties.h>
+#endif
 
 #include "common/version.h"
 #include "common/timing.h"
@@ -37,6 +40,11 @@
 
 #include "logger.h"
 #include "messaging.hpp"
+
+#ifndef QCOM
+// no encoder on PC
+#define DISABLE_ENCODER
+#endif
 
 
 #ifndef DISABLE_ENCODER
@@ -420,6 +428,7 @@ kj::Array<capnp::word> gen_init_data() {
 
   init.setKernelVersion(util::read_file("/proc/version"));
 
+#ifdef QCOM
   {
     std::vector<std::pair<std::string, std::string> > properties;
     property_list(append_property, (void*)&properties);
@@ -431,6 +440,7 @@ kj::Array<capnp::word> gen_init_data() {
       lentry.setValue(properties[i].second);
     }
   }
+#endif
 
   const char* dongle_id = getenv("DONGLE_ID");
   if (dongle_id) {
@@ -443,21 +453,22 @@ kj::Array<capnp::word> gen_init_data() {
   }
 
   char* git_commit = NULL;
-  read_db_value(NULL, "GitCommit", &git_commit, NULL);
+  size_t size;
+  read_db_value(NULL, "GitCommit", &git_commit, &size);
   if (git_commit) {
-    init.setGitCommit(capnp::Text::Reader(git_commit));
+    init.setGitCommit(capnp::Text::Reader(git_commit, size));
   }
 
   char* git_branch = NULL;
-  read_db_value(NULL, "GitBranch", &git_branch, NULL);
+  read_db_value(NULL, "GitBranch", &git_branch, &size);
   if (git_branch) {
-    init.setGitBranch(capnp::Text::Reader(git_branch));
+    init.setGitBranch(capnp::Text::Reader(git_branch, size));
   }
 
   char* git_remote = NULL;
-  read_db_value(NULL, "GitRemote", &git_remote, NULL);
+  read_db_value(NULL, "GitRemote", &git_remote, &size);
   if (git_remote) {
-    init.setGitRemote(capnp::Text::Reader(git_remote));
+    init.setGitRemote(capnp::Text::Reader(git_remote, size));
   }
 
   char* passive = NULL;

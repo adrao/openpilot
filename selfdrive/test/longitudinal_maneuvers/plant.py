@@ -115,7 +115,7 @@ class Plant():
       Plant.live_params = messaging.pub_sock('liveParameters')
       Plant.health = messaging.pub_sock('health')
       Plant.thermal = messaging.pub_sock('thermal')
-      Plant.driverMonitoring = messaging.pub_sock('driverMonitoring')
+      Plant.driverState = messaging.pub_sock('driverState')
       Plant.cal = messaging.pub_sock('liveCalibration')
       Plant.controls_state = messaging.sub_sock('controlsState')
       Plant.plan = messaging.sub_sock('plan')
@@ -272,6 +272,7 @@ class Plant():
            'INTERCEPTOR_GAS',
            'INTERCEPTOR_GAS2',
            'IMPERIAL_UNIT',
+           'MOTOR_TORQUE',
            ])
     vls = vls_tuple(
            self.speed_sensor(speed),
@@ -304,7 +305,8 @@ class Plant():
            0,  # Brake hold
            0,  # Interceptor feedback
            0,  # Interceptor 2 feedback
-           False
+           False,
+           0,
            )
 
     # TODO: publish each message at proper frequency
@@ -364,11 +366,11 @@ class Plant():
     live_parameters.liveParameters.stiffnessFactor = 1.0
     Plant.live_params.send(live_parameters.to_bytes())
 
-    driver_monitoring = messaging.new_message()
-    driver_monitoring.init('driverMonitoring')
-    driver_monitoring.driverMonitoring.faceOrientation = [0.] * 3
-    driver_monitoring.driverMonitoring.facePosition = [0.] * 2
-    Plant.driverMonitoring.send(driver_monitoring.to_bytes())
+    driver_state = messaging.new_message()
+    driver_state.init('driverState')
+    driver_state.driverState.faceOrientation = [0.] * 3
+    driver_state.driverState.facePosition = [0.] * 2
+    Plant.driverState.send(driver_state.to_bytes())
 
     health = messaging.new_message()
     health.init('health')

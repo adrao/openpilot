@@ -147,7 +147,7 @@ void* frontview_thread(void *arg) {
   // we subscribe to this for placement of the AE metering box
   // TODO: the loop is bad, ideally models shouldn't affect sensors
   Context *msg_context = Context::create();
-  SubSocket *monitoring_sock = SubSocket::create(msg_context, "driverMonitoring", "127.0.0.1", true);
+  SubSocket *monitoring_sock = SubSocket::create(msg_context, "driverState", "127.0.0.1", true);
   assert(monitoring_sock != NULL);
 
   cl_command_queue q = clCreateCommandQueue(s->context, s->device_id, 0, &err);
@@ -194,10 +194,10 @@ void* frontview_thread(void *arg) {
       capnp::FlatArrayMessageReader cmsg(amsg);
       cereal::Event::Reader event = cmsg.getRoot<cereal::Event>();
 
-      float face_prob = event.getDriverMonitoring().getFaceProb();
+      float face_prob = event.getDriverState().getFaceProb();
       float face_position[2];
-      face_position[0] = event.getDriverMonitoring().getFacePosition()[0];
-      face_position[1] = event.getDriverMonitoring().getFacePosition()[1];
+      face_position[0] = event.getDriverState().getFacePosition()[0];
+      face_position[1] = event.getDriverState().getFacePosition()[1];
 
       // set front camera metering target
       if (face_prob > 0.4)
@@ -679,14 +679,6 @@ void* visionserver_client_thread(void* arg) {
           }
         } else {
           assert(false);
-        }
-
-        if (stream_type == VISION_STREAM_RGB_BACK ||
-            stream_type == VISION_STREAM_RGB_FRONT) {
-          /*stream_bufs->buf_info.ui_info = (VisionUIInfo){
-            .transformed_width = s->model.in.transformed_width,
-            .transformed_height = s->model.in.transformed_height,
-          };*/
         }
         vipc_send(fd, &rep);
         streams[stream_type].subscribed = true;

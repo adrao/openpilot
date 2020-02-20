@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import numpy as np
+import crcmod
 from panda import Panda
 from panda.tests.safety import libpandasafety_py
 from panda.tests.safety.common import test_relay_malfunction, make_msg, test_manually_enable_controls_allowed, test_spam_can_buses
@@ -23,12 +24,38 @@ def sign(a):
   else:
     return -1
 
+# Python crcmod works differently from every other CRC calculator in the planet in some subtle
+# way. The implied leading 1 on the polynomial isn't a big deal, but for some reason, we need
+# to feed it initCrc 0x00 instead of 0xFF like it should be.
+volkswagen_crc_8h2f = crcmod.mkCrcFun(0x12F, initCrc=0x00, rev=False, xorOut=0xFF)
+
+def volkswagen_mqb_crc(msg, addr, len_msg):
+  # TODO: Needs cleanup
+  msg_reversed = msg.RDLR.to_bytes(4, 'little') + msg.RDHR.to_bytes(4, 'little')
+  counter = (msg.RDLR & 0xF00) >> 8
+  if addr == 0x9F:
+    magic_pad = b'\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5\xF5'[counter]
+  elif addr == 0x120:
+    magic_pad = b'\xC4\xE2\x4F\xE4\xF8\x2F\x56\x81\x9F\xE5\x83\x44\x05\x3F\x97\xDF'[counter]
+  elif addr == 0x121:
+    magic_pad = b'\xE9\x65\xAE\x6B\x7B\x35\xE5\x5F\x4E\xC7\x86\xA2\xBB\xDD\xEB\xB4'[counter]
+  elif addr == 0x126:
+    magic_pad = b'\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA\xDA'[counter]
+    debug = False
+  else:
+    magic_pad = b'\x00'
+  return volkswagen_crc_8h2f(msg_reversed[1:] + magic_pad.to_bytes(1, 'little'))
+
 class TestVolkswagenSafety(unittest.TestCase):
   @classmethod
   def setUp(cls):
     cls.safety = libpandasafety_py.libpandasafety
-    cls.safety.set_safety_hooks(Panda.SAFETY_VOLKSWAGEN, 0)
+    cls.safety.set_safety_hooks(Panda.SAFETY_VOLKSWAGEN_MQB, 0)
     cls.safety.init_tests_volkswagen()
+    cls.cnt_eps_01 = 0
+    cls.cnt_hca_01 = 0
+    cls.cnt_motor_20 = 0
+    cls.cnt_tsk_06 = 0
 
   def _set_prev_torque(self, t):
     self.safety.set_volkswagen_desired_torque_last(t)
@@ -40,6 +67,9 @@ class TestVolkswagenSafety(unittest.TestCase):
     to_send[0].RDHR = ((t & 0x1FFF) << 8)
     if torque < 0:
       to_send[0].RDHR |= 0x1 << 23
+    to_send[0].RDLR |= (self.cnt_eps_01 % 16) << 8
+    to_send[0].RDLR |= volkswagen_mqb_crc(to_send[0], 0x9F, 8)
+    self.cnt_eps_01 += 1
     return to_send
 
   def _torque_msg(self, torque):
@@ -48,11 +78,17 @@ class TestVolkswagenSafety(unittest.TestCase):
     to_send[0].RDLR = (t & 0xFFF) << 16
     if torque < 0:
       to_send[0].RDLR |= 0x1 << 31
+    to_send[0].RDLR |= (self.cnt_hca_01 % 16) << 8
+    to_send[0].RDLR |= volkswagen_mqb_crc(to_send[0], 0x126, 8)
+    self.cnt_hca_01 += 1
     return to_send
 
   def _gas_msg(self, gas):
     to_send = make_msg(0, 0x121)
     to_send[0].RDLR = (gas & 0xFF) << 12
+    to_send[0].RDLR |= (self.cnt_motor_20 % 16) << 8
+    to_send[0].RDLR |= volkswagen_mqb_crc(to_send[0], 0x121, 8)
+    self.cnt_motor_20 += 1
     return to_send
 
   def _button_msg(self, bit):
@@ -75,28 +111,25 @@ class TestVolkswagenSafety(unittest.TestCase):
     self.assertFalse(self.safety.get_controls_allowed())
 
   def test_enable_control_allowed_from_cruise(self):
-    to_push = make_msg(0, 0x122)
-    to_push[0].RDHR = 0x30000000
+    to_push = make_msg(0, 0x120)
+    to_push[0].RDLR = 0x3 << 24
+    to_push[0].RDLR |= (self.cnt_tsk_06 % 16) << 8
+    to_push[0].RDLR |= volkswagen_mqb_crc(to_push[0], 0x120, 8)
+    self.cnt_tsk_06 += 1
     self.safety.safety_rx_hook(to_push)
     self.assertTrue(self.safety.get_controls_allowed())
 
   def test_disable_control_allowed_from_cruise(self):
-    to_push = make_msg(0, 0x122)
+    to_push = make_msg(0, 0x120)
     self.safety.set_controls_allowed(1)
     self.safety.safety_rx_hook(to_push)
     self.assertFalse(self.safety.get_controls_allowed())
 
   def test_disengage_on_gas(self):
-    for long_controls_allowed in [0, 1]:
-      self.safety.set_long_controls_allowed(long_controls_allowed)
-      self.safety.safety_rx_hook(self._gas_msg(0))
-      self.safety.set_controls_allowed(True)
-      self.safety.safety_rx_hook(self._gas_msg(1))
-      if long_controls_allowed:
-        self.assertFalse(self.safety.get_controls_allowed())
-      else:
-        self.assertTrue(self.safety.get_controls_allowed())
-    self.safety.set_long_controls_allowed(True)
+    self.safety.safety_rx_hook(self._gas_msg(0))
+    self.safety.set_controls_allowed(True)
+    self.safety.safety_rx_hook(self._gas_msg(1))
+    self.assertFalse(self.safety.get_controls_allowed())
 
   def test_allow_engage_with_gas_pressed(self):
     self.safety.safety_rx_hook(self._gas_msg(1))

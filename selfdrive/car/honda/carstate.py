@@ -9,14 +9,9 @@ from selfdrive.car.honda.values import CAR, DBC, STEER_THRESHOLD, SPEED_FACTOR, 
 
 GearShifter = car.CarState.GearShifter
 
-def parse_gear_shifter(gear, vals):
-
-  val_to_capnp = {'P': GearShifter.park, 'R': GearShifter.reverse, 'N': GearShifter.neutral,
-                  'D': GearShifter.drive, 'S': GearShifter.sport, 'L': GearShifter.low}
-  try:
-    return val_to_capnp[vals[gear]]
-  except KeyError:
-    return "unknown"
+def parse_gear_shifter(gear):
+  return {'P': GearShifter.park, 'R': GearShifter.reverse, 'N': GearShifter.neutral,
+            'D': GearShifter.drive, 'S': GearShifter.sport, 'L': GearShifter.low}.get(gear, GearShifter.unknown)
 
 
 def calc_cruise_offset(offset, speed):
@@ -41,8 +36,8 @@ def get_can_signals(CP):
       ("WHEEL_SPEED_RR", "WHEEL_SPEEDS", 0),
       ("STEER_ANGLE", "STEERING_SENSORS", 0),
       ("STEER_ANGLE_RATE", "STEERING_SENSORS", 0),
+      ("MOTOR_TORQUE", "STEER_MOTOR_TORQUE", 0),
       ("STEER_TORQUE_SENSOR", "STEER_STATUS", 0),
-      ("STEER_TORQUE_MOTOR", "STEER_STATUS", 0),
       ("LEFT_BLINKER", "SCM_FEEDBACK", 0),
       ("RIGHT_BLINKER", "SCM_FEEDBACK", 0),
       ("GEAR", "GEARBOX", 0),
@@ -315,7 +310,7 @@ class CarState():
       self.main_on = cp.vl["SCM_BUTTONS"]['MAIN_ON']
 
     can_gear_shifter = int(cp.vl["GEARBOX"]['GEAR_SHIFTER'])
-    self.gear_shifter = parse_gear_shifter(can_gear_shifter, self.shifter_values)
+    self.gear_shifter = parse_gear_shifter(self.shifter_values.get(can_gear_shifter, None))
 
     self.pedal_gas = cp.vl["POWERTRAIN_DATA"]['PEDAL_GAS']
     # crv doesn't include cruise control
@@ -325,7 +320,7 @@ class CarState():
       self.car_gas = cp.vl["GAS_PEDAL_2"]['CAR_GAS']
 
     self.steer_torque_driver = cp.vl["STEER_STATUS"]['STEER_TORQUE_SENSOR']
-    self.steer_torque_motor = cp.vl["STEER_STATUS"]['STEER_TORQUE_MOTOR']
+    self.steer_torque_motor = cp.vl["STEER_MOTOR_TORQUE"]['MOTOR_TORQUE']
     self.steer_override = abs(self.steer_torque_driver) > STEER_THRESHOLD[self.CP.carFingerprint]
 
     self.brake_switch = cp.vl["POWERTRAIN_DATA"]['BRAKE_SWITCH']
